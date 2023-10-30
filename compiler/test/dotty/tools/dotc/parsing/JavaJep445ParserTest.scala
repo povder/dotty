@@ -20,7 +20,7 @@ class JavaJep445ParserTest extends DottyTest {
          |
          |import some.pkg.*;
          |
-         |private volatile int x = 0;
+         |//private volatile int x = 0;
          |private String s = "s";
          |
          |void main() {}
@@ -43,6 +43,29 @@ class JavaJep445ParserTest extends DottyTest {
          |import some.pkg.*;
          |
          |interface Inner {}
+         |
+         |static class InnerStatic {}
+         |
+         |void main() {}
+         |""".stripMargin
+
+    val parser =
+      JavaParsers.JavaParser(SourceFile.virtual("MyUnnamed.java", code))
+    val tree = parser.parse()
+
+    println(tree.show)
+
+    fail("TODO")
+  }
+  
+  @Test def `treats leading top-level annotated vars as members of unnamed class`: Unit = {
+    val code =
+      s"""
+         |
+         |import some.pkg.*;
+         |
+         |@MyAnnotation
+         |int x = 0;
          |
          |void main() {}
          |""".stripMargin

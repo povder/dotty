@@ -7,7 +7,7 @@ object Flags {
 
     /** A FlagSet represents a set of flags. Flags are encoded as follows:
     *  The first two bits indicate whether a flag set applies to terms,
-    *  to types, or to both.  Bits 2..63 are available for properties
+    *  to types, or to both.  Bits 2..64 are available for properties
     *  and can be doubly used for terms and types.
     */
     opaque type FlagSet = Long
@@ -167,9 +167,9 @@ object Flags {
 
   private inline val FirstFlag = 2
   private inline val FirstNotPickledFlag = 48
-  private inline val MaxFlag = 63
+  private inline val MaxFlag = 64
 
-  private val flagName = Array.fill(64, 2)("")
+  private val flagName = Array.fill(MaxFlag + 1, 2)("")
 
   private def isDefinedAsFlag(idx: Int) = flagName(idx).exists(_.nonEmpty)
 
@@ -196,7 +196,7 @@ object Flags {
   /** The undefined flag set */
   val UndefinedFlags: FlagSet = FlagSet(~KINDFLAGS)
 
-  /** Three flags with given index between 2 and 63.
+  /** Three flags with given index between 2 and 64.
    *  The first applies to both terms and types. the second is a term flag, and
    *  the third is a type flag. Installs given name(s) as the name(s) of the flags.
    *  @param name     The name to be used for the term flag
@@ -433,7 +433,10 @@ object Flags {
   /** Symbol is a constructor proxy (either companion, or apply method) */
   val (ConstructorProxy @ _, _, _) = newFlags(62, "<constructor proxy>") // (could be merged with Lifted)
 
-// --------- Combined Flag Sets and Conjunctions ----------------------
+  /** Symbol is is JEP-445 Java unnamed class */
+  val (JavaUnnamedClass@_, _, _) = newFlags(63, "<unnamed>")
+
+  // --------- Combined Flag Sets and Conjunctions ----------------------
 
   /** All possible flags */
   val AnyFlags: FlagSet = flagRange(FirstFlag, MaxFlag)

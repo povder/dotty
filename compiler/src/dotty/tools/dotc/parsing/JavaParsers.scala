@@ -826,6 +826,27 @@ object JavaParsers {
       addCompanionObject(statics, cls)
     }
 
+    def unnamedClassDecl(priorTypes: List[Tree], start: Offset): List[Tree] = {
+      val name = source.name.replaceAll("\\.java$", "").nn.toTypeName
+      val (statics, body) = typeBodyDecls(CLASS, name, Nil)
+      
+      val (priorStatics, priorBody) = priorTypes.partition {
+        case t: TypeDef => t.mods.is(Flags.JavaStatic)
+        case _: ModuleDef => true
+        case _ => false
+      }
+
+      val cls = atSpan(start, 0) {
+        TypeDef(name, makeTemplate(
+          parents = Nil,
+          stats = priorBody ::: body,
+          tparams = Nil, 
+          needsDummyConstr = true)
+        ).withMods(Modifiers(Flags.Private | Flags.Final | Flags.JavaUnnamedClass))
+      }
+      addCompanionObject(priorStatics ::: statics, cls)
+    }
+
     def recordDecl(start: Offset, mods: Modifiers): List[Tree] =
       accept(RECORD)
       val nameOffset = in.offset
@@ -1067,16 +1088,37 @@ object JavaParsers {
       val buf = new ListBuffer[Tree]
       while (in.token == IMPORT)
         buf ++= importDecl()
+
+      val afterImports = in.offset
+      val typesBuf = new ListBuffer[Tree]
+      
       while (in.token != EOF && in.token != RBRACE) {
         while (in.token == SEMI) in.nextToken()
         if (in.token != EOF) {
           val start = in.offset
           val mods = modifiers(inInterface = false)
           adaptRecordIdentifier() // needed for typeDecl
-          buf ++= typeDecl(start, mods)
+
+          in.token match {
+            case ENUM | INTERFACE | AT | CLASS | RECORD => typesBuf ++= typeDecl(start, mods)
+            case _ =>
+              if (thisPackageName == tpnme.EMPTY_PACKAGE) {
+                // upon encountering non-types directly at a compilation unit level in an unnamed package,
+                // the entire compilation unit is treated as a JEP-445 unnamed class
+                //TODO support @annotated members of unnamed class
+                val cls = unnamedClassDecl(priorTypes = typesBuf.toList, start = afterImports)
+                typesBuf.clear()
+                typesBuf ++= cls
+              } else {
+                in.nextToken()
+                syntaxError(em"illegal start of type declaration", skipIt = true)
+                List(errorTypeTree)
+              }
+          }
         }
       }
-      val unit = atSpan(start) { PackageDef(pkg, buf.toList) }
+      
+      val unit = atSpan(start) { PackageDef(pkg, (buf ++ typesBuf).toList) }
       accept(EOF)
       unit match
         case PackageDef(Ident(nme.EMPTY_PACKAGE), Nil) => EmptyTree
